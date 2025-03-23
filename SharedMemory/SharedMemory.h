@@ -10,36 +10,37 @@
 #define SHAREDMEMORY_API __declspec(dllimport)
 #endif
 
-// Shared memory structure
 struct SharedMemory {
-    char message[256];
+    char message[20];
+    bool isMessageSet = false;
 };
 
-// SharedMemoryHandler class for managing shared memory
 class SHAREDMEMORY_API SharedMemoryHandler {
 private:
     HANDLE hMapFile;
-    HANDLE hEvent;
+    HANDLE hEventProduced;
+    HANDLE hEventConsumed;
     SharedMemory* shm;
+    bool isProducer;
 
 public:
-    // Constructor to initialize the shared memory
-    SharedMemoryHandler(const std::string& shmName, const std::string& eventName);
+    SharedMemoryHandler(const std::wstring& shmName, const int isProducer);
 
-    // Destructor to clean up resources
     ~SharedMemoryHandler();
 
-    // Set a message in shared memory
     void setMessage(const std::string& message);
 
-    // Get a message from shared memory
     const char* getMessage();
 
-    // Function to map shared memory
     SharedMemory* getMemory();
 
-    // Reset event to allow next trigger
     void resetEvent();
+
+    void cleanup();
+
+    void initProducer(const std::wstring& shmName);
+
+    void initConsumer(const std::wstring& shmName);
 };
 
 #endif // SHAREDMEMORY_H
