@@ -32,7 +32,7 @@ public:
 
     ~SharedMemoryHandler();
 
-    void setMessage(const std::string& message);
+    bool setMessage(const std::string& message);
 
     const char* getMessage();
 

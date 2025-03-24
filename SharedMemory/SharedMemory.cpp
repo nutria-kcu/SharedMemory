@@ -33,7 +33,12 @@ SharedMemoryHandler::~SharedMemoryHandler() {
     cleanup();
 }
 
-void SharedMemoryHandler::setMessage(const std::string& message) {
+bool SharedMemoryHandler::setMessage(const std::string& message) {
+    if (!isProducer) {
+        std::cout << "getMessage accessed from consumer\n";
+        return false;
+    }
+
     if (shm->isMessageSet) {
         std::cout << "Message already set. Waiting for consumer to read.\n";
         std::cout << "Ignore the given msg\n";
@@ -41,9 +46,16 @@ void SharedMemoryHandler::setMessage(const std::string& message) {
     strncpy_s(shm->message, message.c_str(), sizeof(shm->message) - 1);
     shm->isMessageSet = true;
     SetEvent(hEventFull);
+
+    return true;
 }
 
 const char* SharedMemoryHandler::getMessage() {
+    if (isProducer) {
+        std::cout << "getMessage accessed from producer\n";
+        return nullptr;
+    }
+
     if (!shm->isMessageSet) {
         std::cout << "No message set.\n";
         return nullptr;
@@ -88,6 +100,12 @@ void SharedMemoryHandler::initProducer(const std::wstring& shmName) {
         shmName.c_str());
 
 
+    //HANDLE CreateEvent(
+    //    LPSECURITY_ATTRIBUTES lpEventAttributes, security stuff, set NULL
+    //    BOOL                  bManualReset, False is Auto Reset
+    //    BOOL                  bInitialState, TRUE if signaled 
+    //    LPCTSTR               lpName
+    //);
     hEventEmpty = CreateEvent(NULL, TRUE, TRUE, L"IPCEMPTY");
     hEventFull = CreateEvent(NULL, TRUE, FALSE, L"IPCFULL");
 }
