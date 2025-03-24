@@ -20,10 +20,7 @@ SharedMemoryHandler::SharedMemoryHandler(const std::wstring& shmName, const int 
         exit(1);
     }
 
-    hEventProduced = OpenEvent(EVENT_ALL_ACCESS, FALSE, L"IPCPRODUCED");
-    hEventConsumed = OpenEvent(EVENT_ALL_ACCESS, FALSE, L"IPCCONSUMED");
-
-    if (!hEventProduced || !hEventConsumed) {
+    if (!hEventEmpty || !hEventFull) {
         std::cerr << "Failed to open shared event\n";
         cleanup();
         exit(1);
@@ -43,7 +40,7 @@ void SharedMemoryHandler::setMessage(const std::string& message) {
     }
     strncpy_s(shm->message, message.c_str(), sizeof(shm->message) - 1);
     shm->isMessageSet = true;
-    SetEvent(hEventProduced);
+    SetEvent(hEventFull);
 }
 
 const char* SharedMemoryHandler::getMessage() {
@@ -52,7 +49,7 @@ const char* SharedMemoryHandler::getMessage() {
         return nullptr;
     }
     shm->isMessageSet = false;
-    SetEvent(hEventConsumed);
+    SetEvent(hEventEmpty);
     return shm->message;
 }
 
@@ -61,8 +58,8 @@ SharedMemory* SharedMemoryHandler::getMemory() {
 }
 
 void SharedMemoryHandler::resetEvent() {
-    ResetEvent(hEventProduced);
-    ResetEvent(hEventConsumed);
+    ResetEvent(hEventEmpty);
+    ResetEvent(hEventFull);
 }
 
 void SharedMemoryHandler::cleanup() {
@@ -72,12 +69,12 @@ void SharedMemoryHandler::cleanup() {
     if (hMapFile) {
         CloseHandle(hMapFile);
     }
-    if (hEventProduced) {
-        CloseHandle(hEventProduced);
+    if (hEventFull) {
+        CloseHandle(hEventFull);
     }
 
-    if (hEventConsumed) {
-        CloseHandle(hEventConsumed);
+    if (hEventEmpty) {
+        CloseHandle(hEventEmpty);
     }
 }
 
@@ -89,8 +86,15 @@ void SharedMemoryHandler::initProducer(const std::wstring& shmName) {
         0,                       // maximum object size (high-order DWORD)
         sizeof(SharedMemory),                // maximum object size (low-order DWORD)
         shmName.c_str());
+
+
+    hEventEmpty = CreateEvent(NULL, TRUE, TRUE, L"IPCEMPTY");
+    hEventFull = CreateEvent(NULL, TRUE, FALSE, L"IPCFULL");
 }
 
 void SharedMemoryHandler::initConsumer(const std::wstring& shmName) {
     hMapFile =  OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, shmName.c_str());
+
+    hEventEmpty = OpenEvent(EVENT_ALL_ACCESS, FALSE, L"IPCEMPTY");
+    hEventFull = OpenEvent(EVENT_ALL_ACCESS, FALSE, L"IPCFULL");
 }

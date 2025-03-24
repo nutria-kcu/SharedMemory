@@ -18,10 +18,14 @@ struct SharedMemory {
 class SHAREDMEMORY_API SharedMemoryHandler {
 private:
     HANDLE hMapFile;
-    HANDLE hEventProduced;
-    HANDLE hEventConsumed;
+    HANDLE hEventFull;
+    HANDLE hEventEmpty;
     SharedMemory* shm;
+
     bool isProducer;
+    void cleanup();
+    void initProducer(const std::wstring& shmName);
+    void initConsumer(const std::wstring& shmName);
 
 public:
     SharedMemoryHandler(const std::wstring& shmName, const int isProducer);
@@ -35,12 +39,6 @@ public:
     SharedMemory* getMemory();
 
     void resetEvent();
-
-    void cleanup();
-
-    void initProducer(const std::wstring& shmName);
-
-    void initConsumer(const std::wstring& shmName);
 };
 
 #endif // SHAREDMEMORY_H
