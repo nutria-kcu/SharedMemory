@@ -39,6 +39,10 @@ public:
     SharedMemory* getMemory();
 
     void resetEvent();
+
+    HANDLE getFullEvent();
+
+    HANDLE getEmptyEvent();
 };
 
 #endif // SHAREDMEMORY_H

@@ -116,3 +116,11 @@ void SharedMemoryHandler::initConsumer(const std::wstring& shmName) {
     hEventEmpty = OpenEvent(EVENT_ALL_ACCESS, FALSE, L"IPCEMPTY");
     hEventFull = OpenEvent(EVENT_ALL_ACCESS, FALSE, L"IPCFULL");
 }
+
+HANDLE SharedMemoryHandler::getEmptyEvent() {
+    return hEventEmpty;
+}
+
+HANDLE SharedMemoryHandler::getFullEvent() {
+    return hEventFull;
+}
