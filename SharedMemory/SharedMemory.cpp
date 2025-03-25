@@ -42,9 +42,12 @@ bool SharedMemoryHandler::setMessage(int input = 0, int option = 0) {
         return false;
     }
 
+    std::lock_guard<std::mutex> lock(mutex);
+
     if (shm->isMessageSet) {
         std::cout << "Message already set. Waiting for consumer to read.\n";
         std::cout << "Ignore the given msg\n";
+        return false;
     }
 
     shm->cmd = input;
@@ -58,6 +61,8 @@ SharedMemory* SharedMemoryHandler::getMessage() {
         std::cout << "getMessage accessed from producer\n";
         return nullptr;
     }
+
+    std::lock_guard<std::mutex> lock(mutex);
 
     if (!shm->isMessageSet) {
         std::cout << "No command set.\n";

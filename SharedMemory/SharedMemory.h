@@ -3,6 +3,7 @@
 
 #include <windows.h>
 #include <string>
+#include <mutex>
 
 #ifdef SHAREDMEMORY_EXPORTS
 #define SHAREDMEMORY_API __declspec(dllexport)
@@ -22,6 +23,9 @@ private:
     HANDLE hEventFull;
     HANDLE hEventEmpty;
     SharedMemory* shm;
+    
+    // not goint to use global mutex using CreateMutex since only producer access setMessage and consumer access getMessage
+    std::mutex mutex; 
 
     bool isProducer;
     void cleanup();
