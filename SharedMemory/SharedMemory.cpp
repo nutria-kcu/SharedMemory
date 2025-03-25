@@ -1,9 +1,12 @@
 #include "pch.h"
 #include "SharedMemory.h"
 #include <iostream>
+#include <tchar.h>
 
-SharedMemoryHandler::SharedMemoryHandler(const std::wstring& shmName, const int isProducer) {
+SharedMemoryHandler::SharedMemoryHandler(const TCHAR* shmName, const int isProducer) {
     SharedMemoryHandler::isProducer = isProducer;
+
+    _tprintf(_T("SharedMemoryName: %s\n"), shmName);
 
     if (isProducer) {
         std::cout << "Shared Mem init - producer\n";
@@ -33,7 +36,7 @@ SharedMemoryHandler::~SharedMemoryHandler() {
     cleanup();
 }
 
-bool SharedMemoryHandler::setMessage(const std::string& message) {
+bool SharedMemoryHandler::setMessage(int input = 0, int option = 0) {
     if (!isProducer) {
         std::cout << "getMessage accessed from consumer\n";
         return false;
@@ -43,29 +46,24 @@ bool SharedMemoryHandler::setMessage(const std::string& message) {
         std::cout << "Message already set. Waiting for consumer to read.\n";
         std::cout << "Ignore the given msg\n";
     }
-    strncpy_s(shm->message, message.c_str(), sizeof(shm->message) - 1);
-    shm->isMessageSet = true;
-    SetEvent(hEventFull);
 
+    shm->cmd = input;
+    shm->option = option;
+    shm->isMessageSet = true;
     return true;
 }
 
-const char* SharedMemoryHandler::getMessage() {
+SharedMemory* SharedMemoryHandler::getMessage() {
     if (isProducer) {
         std::cout << "getMessage accessed from producer\n";
         return nullptr;
     }
 
     if (!shm->isMessageSet) {
-        std::cout << "No message set.\n";
+        std::cout << "No command set.\n";
         return nullptr;
     }
     shm->isMessageSet = false;
-    SetEvent(hEventEmpty);
-    return shm->message;
-}
-
-SharedMemory* SharedMemoryHandler::getMemory() {
     return shm;
 }
 
@@ -90,14 +88,14 @@ void SharedMemoryHandler::cleanup() {
     }
 }
 
-void SharedMemoryHandler::initProducer(const std::wstring& shmName) {
+void SharedMemoryHandler::initProducer(const TCHAR* shmName) {
     hMapFile = CreateFileMapping(
         INVALID_HANDLE_VALUE,    // use paging file
         NULL,                    // default security
         PAGE_READWRITE,          // read/write access
         0,                       // maximum object size (high-order DWORD)
         sizeof(SharedMemory),                // maximum object size (low-order DWORD)
-        shmName.c_str());
+        shmName);
 
 
     //HANDLE CreateEvent(
@@ -110,8 +108,8 @@ void SharedMemoryHandler::initProducer(const std::wstring& shmName) {
     hEventFull = CreateEvent(NULL, TRUE, FALSE, L"IPCFULL");
 }
 
-void SharedMemoryHandler::initConsumer(const std::wstring& shmName) {
-    hMapFile =  OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, shmName.c_str());
+void SharedMemoryHandler::initConsumer(const TCHAR* shmName) {
+    hMapFile =  OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, shmName);
 
     hEventEmpty = OpenEvent(EVENT_ALL_ACCESS, FALSE, L"IPCEMPTY");
     hEventFull = OpenEvent(EVENT_ALL_ACCESS, FALSE, L"IPCFULL");

@@ -11,7 +11,8 @@
 #endif
 
 struct SharedMemory {
-    char message[20];
+    int cmd = -1;
+    int option = -1;
     bool isMessageSet = false;
 };
 
@@ -24,19 +25,17 @@ private:
 
     bool isProducer;
     void cleanup();
-    void initProducer(const std::wstring& shmName);
-    void initConsumer(const std::wstring& shmName);
+    void initProducer(const TCHAR* shmName);
+    void initConsumer(const TCHAR* shmName);
 
 public:
-    SharedMemoryHandler(const std::wstring& shmName, const int isProducer);
+    SharedMemoryHandler(const TCHAR* shmName, const int isProducer);
 
     ~SharedMemoryHandler();
 
-    bool setMessage(const std::string& message);
+    bool setMessage(int cmd, int option);
 
-    const char* getMessage();
-
-    SharedMemory* getMemory();
+    SharedMemory* getMessage();
 
     void resetEvent();
 
