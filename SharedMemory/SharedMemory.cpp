@@ -3,6 +3,20 @@
 #include <iostream>
 #include <tchar.h>
 
+void printEventStatus(HANDLE hEvent, const std::wstring& eventName) {
+    DWORD status = WaitForSingleObject(hEvent, 0);
+
+    if (status == WAIT_OBJECT_0) {
+        std::wcout << L"Event " << eventName << L" is SIGNED (Set)\n";
+    }
+    else if (status == WAIT_TIMEOUT) {
+        std::wcout << L"Event " << eventName << L" is NOT SIGNED (Reset)\n";
+    }
+    else {
+        std::wcout << L"Event " << eventName << L" status unknown (Error)\n";
+    }
+}
+
 SharedMemoryHandler::SharedMemoryHandler(const TCHAR* shmName, const int isProducer) {
     SharedMemoryHandler::isProducer = isProducer;
 
@@ -30,19 +44,25 @@ SharedMemoryHandler::SharedMemoryHandler(const TCHAR* shmName, const int isProdu
     }
 
     shm = (SharedMemory*)MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(SharedMemory));
+    if (!shm) {
+        std::cerr << "Failed to map shared memory view\n";
+        cleanup();
+        exit(1);
+    }
 }
 
 SharedMemoryHandler::~SharedMemoryHandler() {
     cleanup();
 }
 
-bool SharedMemoryHandler::setMessage(int input = 0, int option = 0) {
+bool SharedMemoryHandler::setMessage(int input, int option) {
     if (!isProducer) {
-        std::cout << "getMessage accessed from consumer\n";
+        std::cout << "setMessage accessed from consumer\n";
         return false;
     }
 
-    std::lock_guard<std::mutex> lock(mutex);
+    printEventStatus(hEventFull, L"full event");
+    printEventStatus(hEventEmpty, L"empty event");
 
     if (shm->isMessageSet) {
         std::cout << "Message already set. Waiting for consumer to read.\n";
@@ -53,6 +73,8 @@ bool SharedMemoryHandler::setMessage(int input = 0, int option = 0) {
     shm->cmd = input;
     shm->option = option;
     shm->isMessageSet = true;
+
+    SetEvent(hEventFull);  // Notify consumer that message is available
     return true;
 }
 
@@ -68,8 +90,13 @@ SharedMemory* SharedMemoryHandler::getMessage() {
         std::cout << "No command set.\n";
         return nullptr;
     }
+
+    SharedMemory* msg = new SharedMemory(*shm);  // Copy message data
     shm->isMessageSet = false;
-    return shm;
+
+    ResetEvent(hEventFull);
+    SetEvent(hEventEmpty);  // Notify producer that buffer is empty
+    return msg;
 }
 
 void SharedMemoryHandler::resetEvent() {
@@ -87,7 +114,6 @@ void SharedMemoryHandler::cleanup() {
     if (hEventFull) {
         CloseHandle(hEventFull);
     }
-
     if (hEventEmpty) {
         CloseHandle(hEventEmpty);
     }
@@ -95,29 +121,40 @@ void SharedMemoryHandler::cleanup() {
 
 void SharedMemoryHandler::initProducer(const TCHAR* shmName) {
     hMapFile = CreateFileMapping(
-        INVALID_HANDLE_VALUE,    // use paging file
-        NULL,                    // default security
-        PAGE_READWRITE,          // read/write access
-        0,                       // maximum object size (high-order DWORD)
-        sizeof(SharedMemory),                // maximum object size (low-order DWORD)
-        shmName);
+        INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(SharedMemory), shmName);
 
+    if (!hMapFile) {
+        std::cerr << "Failed to create shared memory\n";
+        return;
+    }
 
-    //HANDLE CreateEvent(
-    //    LPSECURITY_ATTRIBUTES lpEventAttributes, security stuff, set NULL
-    //    BOOL                  bManualReset, False is Auto Reset
-    //    BOOL                  bInitialState, TRUE if signaled 
-    //    LPCTSTR               lpName
-    //);
     hEventEmpty = CreateEvent(NULL, TRUE, TRUE, L"IPCEMPTY");
     hEventFull = CreateEvent(NULL, TRUE, FALSE, L"IPCFULL");
+
+    if (GetLastError() != ERROR_ALREADY_EXISTS) {
+        shm = (SharedMemory*)MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(SharedMemory));
+        if (shm) {
+            ZeroMemory(shm, sizeof(SharedMemory));  // Initialize only if newly created
+        }
+    }
 }
 
 void SharedMemoryHandler::initConsumer(const TCHAR* shmName) {
-    hMapFile =  OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, shmName);
+    hMapFile = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, shmName);
+    if (!hMapFile) {
+        std::cerr << "Failed to open shared memory\n";
+        return;
+    }
 
     hEventEmpty = OpenEvent(EVENT_ALL_ACCESS, FALSE, L"IPCEMPTY");
     hEventFull = OpenEvent(EVENT_ALL_ACCESS, FALSE, L"IPCFULL");
+
+    shm = (SharedMemory*)MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(SharedMemory));
+    if (!shm) {
+        std::cerr << "Failed to map shared memory in consumer\n";
+        cleanup();
+        exit(1);
+    }
 }
 
 HANDLE SharedMemoryHandler::getEmptyEvent() {
